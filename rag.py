@@ -11,6 +11,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple
+import tempfile
 
 import pandas as pd
 from langchain_core.documents import Document
@@ -26,7 +27,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Paths & constants
 # ---------------------------------------------------------------------------
-CHROMA_DIR = Path(__file__).parent / "chroma_db"
+
+CHROMA_DIR = Path(tempfile.gettempdir()) / "retail_sales_chroma"
+CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 COLLECTION_NAME = "retail_sales"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 TOP_K = 6
