@@ -134,6 +134,8 @@ if raw_df is not None:
 # ---------------------------------------------------------------------------
 if "cleaned_df" not in st.session_state:
     st.session_state.cleaned_df = None
+if "vectorstore" not in st.session_state:
+    st.session_state.vectorstore = None
 if "vectorstore_ready" not in st.session_state:
     st.session_state.vectorstore_ready = False
 if "etl_stats" not in st.session_state:
@@ -221,15 +223,22 @@ if run_button and temp_path is not None:
                 # ----------------------------------------------------------
                 with st.spinner("Building RAG knowledge base (Chroma + embeddings) …"):
                     try:
-                        from rag import build_or_update_vectorstore, clear_vectorstore
+                        from rag import build_or_update_vectorstore
 
-                        clear_vectorstore()  # fresh index per upload
-                        build_or_update_vectorstore(cleaned)
+                        # Build a fresh in-memory vector store and keep the
+                        # Python object in Streamlit session state.
+                        st.session_state.vectorstore = None
+                        st.session_state.vectorstore_ready = False
+
+                        vectorstore = build_or_update_vectorstore(cleaned)
+                        st.session_state.vectorstore = vectorstore
                         st.session_state.vectorstore_ready = True
+
                         st.success(
                             f"Knowledge base ready – {len(cleaned)} sales records indexed."
                         )
                     except Exception as rag_exc:  # noqa: BLE001
+                        st.session_state.vectorstore = None
                         st.session_state.vectorstore_ready = False
                         logger.exception("RAG indexing failed")
                         st.warning(
@@ -275,13 +284,20 @@ else:
     if ask_clicked and question.strip():
         with st.spinner("Retrieving relevant records and generating answer …"):
             try:
-                from rag import load_vectorstore, answer_question
+                from rag import answer_question
 
-                vs = load_vectorstore()
+                # The in-memory Chroma object is stored in session state.
+                vs = st.session_state.get("vectorstore")
+
                 if vs is None:
+                    st.session_state.vectorstore_ready = False
                     st.error("Vector store not found. Please re-run the ETL pipeline.")
                 else:
-                    answer, sources = answer_question(question.strip(), vs)
+                    answer, sources = answer_question(
+                        question=question.strip(),
+                        vectorstore=vs,
+                        return_sources=show_sources,
+                    )
                     st.subheader("Answer")
                     st.write(answer)
 
